@@ -66,14 +66,14 @@ export function Sidebar() {
         <span className="ml-2 text-lg font-semibold text-sidebar-foreground">BuildStock</span>
       </div>
 
-      <div className="flex-1 px-3 py-4">
+      <div className="flex-1 px-3 py-4 overflow-y-auto">
         <div className="mb-4 px-3">
           <p className="text-xs font-medium text-sidebar-foreground/60 uppercase tracking-wider">
             {user.role === "admin" && "Administrateur"}
             {user.role === "inventory_manager" && "Responsable Inventaire"}
             {user.role === "commercial_manager" && "Responsable Commercial"}
           </p>
-          <p className="text-sm font-medium text-sidebar-foreground mt-1">{user.name}</p>
+          <p className="text-sm font-medium text-sidebar-foreground mt-1 truncate">{user.name}</p>
         </div>
 
         <nav className="space-y-1">
@@ -84,14 +84,14 @@ export function Sidebar() {
                 <Button
                   variant={isActive ? "secondary" : "ghost"}
                   className={cn(
-                    "w-full justify-start",
+                    "w-full justify-start text-sm",
                     isActive
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground",
                   )}
                 >
-                  <item.icon className="mr-3 h-4 w-4" />
-                  {item.name}
+                  <item.icon className="mr-3 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">{item.name}</span>
                 </Button>
               </Link>
             )
@@ -102,11 +102,11 @@ export function Sidebar() {
       <div className="p-3 border-t border-sidebar-border">
         <Button
           variant="ghost"
-          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-primary"
+          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-primary text-sm"
           onClick={logout}
         >
-          <LogOut className="mr-3 h-4 w-4" />
-          Déconnexion
+          <LogOut className="mr-3 h-4 w-4 flex-shrink-0" />
+          <span className="truncate">Déconnexion</span>
         </Button>
       </div>
     </div>
