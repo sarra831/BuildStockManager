@@ -12,6 +12,7 @@ import { mockOrders } from "@/lib/mock-orders"
 import type { Order } from "@/types/orders"
 import { CreateOrderDialog } from "./create-order-dialog"
 import { OrderDetailsDialog } from "./order-details-dialog"
+import { ViewToggle } from "@/components/common/view-toggle"
 
 export function OrdersList() {
   const [orders, setOrders] = useState<Order[]>(mockOrders)
@@ -19,6 +20,7 @@ export function OrdersList() {
   const [selectedStatus, setSelectedStatus] = useState<string>("all")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [view, setView] = useState<"table" | "grid" | "cards">("table")
 
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
@@ -102,22 +104,80 @@ export function OrdersList() {
     { value: "cancelled", label: "Annulé" },
   ]
 
+  const OrderCard = ({ order }: { order: Order }) => (
+    <Card className="h-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
+            <div className="mt-1">
+              <p className="font-medium">{order.customerName}</p>
+              {order.customerCompany && <p className="text-sm text-muted-foreground">{order.customerCompany}</p>}
+            </div>
+          </div>
+          <Badge variant={getStatusColor(order.status)}>{getStatusLabel(order.status)}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Date</p>
+            <p className="font-medium">{order.orderDate.toLocaleDateString("fr-FR")}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Articles</p>
+            <p className="font-medium">{order.items.length} article(s)</p>
+          </div>
+          <div className="col-span-2">
+            <p className="text-muted-foreground">Total</p>
+            <p className="font-bold text-lg">€{order.total.toFixed(2)}</p>
+          </div>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)} className="flex-1">
+            <Eye className="h-4 w-4 mr-2" />
+            Voir
+          </Button>
+          {order.status !== "delivered" && order.status !== "cancelled" && (
+            <Select
+              value={order.status}
+              onValueChange={(value: Order["status"]) => handleUpdateOrderStatus(order.id, value)}
+            >
+              <SelectTrigger className="w-[120px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">En attente</SelectItem>
+                <SelectItem value="reserved">Réservé</SelectItem>
+                <SelectItem value="preparing">En préparation</SelectItem>
+                <SelectItem value="ready">Prêt</SelectItem>
+                <SelectItem value="delivered">Livré</SelectItem>
+                <SelectItem value="cancelled">Annulé</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Commandes</h1>
           <p className="text-muted-foreground">Gérez les commandes et réservations clients</p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Nouvelle commande
+          <span className="hidden sm:inline">Nouvelle commande</span>
+          <span className="sm:hidden">Nouvelle</span>
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -170,7 +230,7 @@ export function OrdersList() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -182,23 +242,26 @@ export function OrdersList() {
                 />
               </div>
             </div>
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Tous les statuts" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Tous les statuts" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <ViewToggle view={view} onViewChange={setView} />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Orders Table */}
+      {/* Orders Display */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -207,67 +270,90 @@ export function OrdersList() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>N° Commande</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Articles</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-medium">{order.orderNumber}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{order.customerName}</p>
-                        {order.customerCompany && (
-                          <p className="text-sm text-muted-foreground">{order.customerCompany}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{order.orderDate.toLocaleDateString("fr-FR")}</TableCell>
-                    <TableCell>{order.items.length} article(s)</TableCell>
-                    <TableCell>€{order.total.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusColor(order.status)}>{getStatusLabel(order.status)}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {order.status !== "delivered" && order.status !== "cancelled" && (
-                          <Select
-                            value={order.status}
-                            onValueChange={(value: Order["status"]) => handleUpdateOrderStatus(order.id, value)}
-                          >
-                            <SelectTrigger className="w-[140px] h-8">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">En attente</SelectItem>
-                              <SelectItem value="reserved">Réservé</SelectItem>
-                              <SelectItem value="preparing">En préparation</SelectItem>
-                              <SelectItem value="ready">Prêt</SelectItem>
-                              <SelectItem value="delivered">Livré</SelectItem>
-                              <SelectItem value="cancelled">Annulé</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                    </TableCell>
+          {view === "table" && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N° Commande</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead className="hidden sm:table-cell">Date</TableHead>
+                    <TableHead className="hidden md:table-cell">Articles</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.orderNumber}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{order.customerName}</p>
+                          {order.customerCompany && (
+                            <p className="text-sm text-muted-foreground">{order.customerCompany}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground sm:hidden">
+                            {order.orderDate.toLocaleDateString("fr-FR")} • {order.items.length} article(s)
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {order.orderDate.toLocaleDateString("fr-FR")}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{order.items.length} article(s)</TableCell>
+                      <TableCell>€{order.total.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusColor(order.status)}>{getStatusLabel(order.status)}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => setSelectedOrder(order)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {order.status !== "delivered" && order.status !== "cancelled" && (
+                            <Select
+                              value={order.status}
+                              onValueChange={(value: Order["status"]) => handleUpdateOrderStatus(order.id, value)}
+                            >
+                              <SelectTrigger className="w-[100px] h-8 hidden sm:flex">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">En attente</SelectItem>
+                                <SelectItem value="reserved">Réservé</SelectItem>
+                                <SelectItem value="preparing">En préparation</SelectItem>
+                                <SelectItem value="ready">Prêt</SelectItem>
+                                <SelectItem value="delivered">Livré</SelectItem>
+                                <SelectItem value="cancelled">Annulé</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {view === "grid" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredOrders.map((order) => (
+                <OrderCard key={order.id} order={order} />
+              ))}
+            </div>
+          )}
+
+          {view === "cards" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredOrders.map((order) => (
+                <OrderCard key={order.id} order={order} />
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

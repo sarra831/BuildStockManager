@@ -13,6 +13,7 @@ import type { Invoice } from "@/types/invoicing"
 import { CreateInvoiceDialog } from "./create-invoice-dialog"
 import { InvoiceDetailsDialog } from "./invoice-details-dialog"
 import { AddPaymentDialog } from "./add-payment-dialog"
+import { ViewToggle } from "@/components/common/view-toggle"
 
 export function InvoicesList() {
   const [invoices, setInvoices] = useState<Invoice[]>(mockInvoices)
@@ -21,6 +22,7 @@ export function InvoicesList() {
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null)
+  const [view, setView] = useState<"table" | "grid" | "cards">("table")
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch =
@@ -122,22 +124,79 @@ export function InvoicesList() {
     { value: "cancelled", label: "Annulée" },
   ]
 
+  const InvoiceCard = ({ invoice }: { invoice: Invoice }) => (
+    <Card className="h-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg">{invoice.invoiceNumber}</CardTitle>
+            <div className="mt-1">
+              <p className="font-medium">{invoice.customerName}</p>
+              {invoice.customerCompany && <p className="text-sm text-muted-foreground">{invoice.customerCompany}</p>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isOverdue(invoice) && <AlertTriangle className="h-4 w-4 text-destructive" />}
+            <Badge variant={getStatusColor(isOverdue(invoice) ? "overdue" : invoice.status)}>
+              {getStatusLabel(isOverdue(invoice) ? "overdue" : invoice.status)}
+            </Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Date</p>
+            <p className="font-medium">{invoice.invoiceDate.toLocaleDateString("fr-FR")}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Échéance</p>
+            <p className="font-medium">{invoice.dueDate.toLocaleDateString("fr-FR")}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Total</p>
+            <p className="font-bold">€{invoice.total.toFixed(2)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Restant</p>
+            <p className="font-medium">€{invoice.remainingAmount.toFixed(2)}</p>
+          </div>
+        </div>
+        <div className="flex gap-2 pt-2">
+          <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(invoice)} className="flex-1">
+            <Eye className="h-4 w-4 mr-2" />
+            Voir
+          </Button>
+          <Button variant="outline" size="sm">
+            <Download className="h-4 w-4" />
+          </Button>
+          {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+            <Button variant="outline" size="sm" onClick={() => setPaymentInvoice(invoice)}>
+              <Euro className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Facturation</h1>
           <p className="text-muted-foreground">Gérez vos factures, devis et paiements</p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Nouvelle facture
+          <span className="hidden sm:inline">Nouvelle facture</span>
+          <span className="sm:hidden">Nouvelle</span>
         </Button>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
@@ -221,7 +280,7 @@ export function InvoicesList() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -233,23 +292,26 @@ export function InvoicesList() {
                 />
               </div>
             </div>
-            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Tous les statuts" />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Tous les statuts" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <ViewToggle view={view} onViewChange={setView} />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Invoices Table */}
+      {/* Invoices Display */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -258,68 +320,92 @@ export function InvoicesList() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>N° Facture</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Échéance</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Payé</TableHead>
-                  <TableHead>Restant</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id} className={isOverdue(invoice) ? "bg-destructive/5" : ""}>
-                    <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{invoice.customerName}</p>
-                        {invoice.customerCompany && (
-                          <p className="text-sm text-muted-foreground">{invoice.customerCompany}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{invoice.invoiceDate.toLocaleDateString("fr-FR")}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {invoice.dueDate.toLocaleDateString("fr-FR")}
-                        {isOverdue(invoice) && <AlertTriangle className="h-4 w-4 text-destructive" />}
-                      </div>
-                    </TableCell>
-                    <TableCell>€{invoice.total.toFixed(2)}</TableCell>
-                    <TableCell>€{invoice.paidAmount.toFixed(2)}</TableCell>
-                    <TableCell>€{invoice.remainingAmount.toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusColor(isOverdue(invoice) ? "overdue" : invoice.status)}>
-                        {getStatusLabel(isOverdue(invoice) ? "overdue" : invoice.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(invoice)}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="sm">
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        {invoice.status !== "paid" && invoice.status !== "cancelled" && (
-                          <Button variant="outline" size="sm" onClick={() => setPaymentInvoice(invoice)}>
-                            <Euro className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
+          {view === "table" && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N° Facture</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead className="hidden sm:table-cell">Date</TableHead>
+                    <TableHead className="hidden md:table-cell">Échéance</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead className="hidden lg:table-cell">Payé</TableHead>
+                    <TableHead className="hidden sm:table-cell">Restant</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredInvoices.map((invoice) => (
+                    <TableRow key={invoice.id} className={isOverdue(invoice) ? "bg-destructive/5" : ""}>
+                      <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{invoice.customerName}</p>
+                          {invoice.customerCompany && (
+                            <p className="text-sm text-muted-foreground">{invoice.customerCompany}</p>
+                          )}
+                          <div className="sm:hidden text-xs text-muted-foreground mt-1">
+                            {invoice.invoiceDate.toLocaleDateString("fr-FR")} • Restant: €
+                            {invoice.remainingAmount.toFixed(2)}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {invoice.invoiceDate.toLocaleDateString("fr-FR")}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div className="flex items-center gap-2">
+                          {invoice.dueDate.toLocaleDateString("fr-FR")}
+                          {isOverdue(invoice) && <AlertTriangle className="h-4 w-4 text-destructive" />}
+                        </div>
+                      </TableCell>
+                      <TableCell>€{invoice.total.toFixed(2)}</TableCell>
+                      <TableCell className="hidden lg:table-cell">€{invoice.paidAmount.toFixed(2)}</TableCell>
+                      <TableCell className="hidden sm:table-cell">€{invoice.remainingAmount.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusColor(isOverdue(invoice) ? "overdue" : invoice.status)}>
+                          {getStatusLabel(isOverdue(invoice) ? "overdue" : invoice.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button variant="outline" size="sm" onClick={() => setSelectedInvoice(invoice)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" className="hidden sm:flex bg-transparent">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                            <Button variant="outline" size="sm" onClick={() => setPaymentInvoice(invoice)}>
+                              <Euro className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {view === "grid" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {filteredInvoices.map((invoice) => (
+                <InvoiceCard key={invoice.id} invoice={invoice} />
+              ))}
+            </div>
+          )}
+
+          {view === "cards" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredInvoices.map((invoice) => (
+                <InvoiceCard key={invoice.id} invoice={invoice} />
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
