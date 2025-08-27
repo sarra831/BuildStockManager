@@ -4,11 +4,12 @@ import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import { AuthProvider } from "@/contexts/auth-context"
+import { CurrencyProvider } from "@/contexts/currency-context"
 
 export const metadata: Metadata = {
   title: "BuildStock Manager",
   description: "Système de gestion de stock pour matériaux de construction",
-  generator: "v1scgroup.app",
+  generator: "BuildStock.app",
 }
 
 export default function RootLayout({
@@ -19,7 +20,9 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <AuthProvider>{children}</AuthProvider>
+        <CurrencyProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </CurrencyProvider>
       </body>
     </html>
   )

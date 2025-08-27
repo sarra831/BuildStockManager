@@ -20,6 +20,7 @@ export interface Quote {
 export interface Invoice {
   id: string
   invoiceNumber: string
+  documentType: "facture" | "bon_livraison" | "bon_achat" | "devis"
   orderId?: string
   quoteId?: string
   customerId: string
@@ -28,6 +29,7 @@ export interface Invoice {
   customerEmail: string
   customerAddress: string
   customerTaxId?: string
+  driverName?: string
   items: OrderItem[]
   subtotal: number
   taxRate: number
@@ -55,6 +57,50 @@ export interface Payment {
   createdBy: string
   createdByName: string
 }
+
+export interface DocumentTypeConfig {
+  type: "facture" | "bon_livraison" | "bon_achat" | "devis"
+  label: string
+  prefix: string
+  showTax: boolean
+  showPayment: boolean
+  showDriver: boolean
+}
+
+export const DOCUMENT_TYPES: DocumentTypeConfig[] = [
+  {
+    type: "facture",
+    label: "Facture",
+    prefix: "FACT-",
+    showTax: true,
+    showPayment: true,
+    showDriver: false,
+  },
+  {
+    type: "bon_livraison",
+    label: "Bon de Livraison",
+    prefix: "BL-",
+    showTax: false,
+    showPayment: false,
+    showDriver: true,
+  },
+  {
+    type: "bon_achat",
+    label: "Bon d'Achat",
+    prefix: "BA-",
+    showTax: true,
+    showPayment: false,
+    showDriver: false,
+  },
+  {
+    type: "devis",
+    label: "Devis",
+    prefix: "DEV-",
+    showTax: true,
+    showPayment: false,
+    showDriver: false,
+  },
+]
 
 // Reuse OrderItem from orders.ts
 import type { OrderItem } from "./orders"

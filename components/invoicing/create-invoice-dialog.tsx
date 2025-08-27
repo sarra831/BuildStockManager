@@ -18,12 +18,14 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Trash2, Calendar, UserPlus } from "lucide-react"
+import { Plus, Trash2, Calendar, UserPlus, FileText } from "lucide-react"
 import { mockCustomers } from "@/lib/mock-orders"
 import { mockInventoryItems } from "@/lib/mock-data"
 import { AddNewClientDialog } from "@/components/common/add-new-client-dialog"
 import type { Invoice, OrderItem } from "@/types/invoicing"
+import { DOCUMENT_TYPES } from "@/types/invoicing"
 import type { Customer } from "@/types/orders"
+import { useCurrency } from "@/contexts/currency-context"
 
 interface CreateInvoiceDialogProps {
   open: boolean
@@ -32,16 +34,20 @@ interface CreateInvoiceDialogProps {
 }
 
 export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: CreateInvoiceDialogProps) {
+  const [documentType, setDocumentType] = useState<"facture" | "bon_livraison" | "bon_achat" | "devis">("facture")
   const [selectedCustomerId, setSelectedCustomerId] = useState("")
   const [dueDate, setDueDate] = useState("")
   const [notes, setNotes] = useState("")
+  const [driverName, setDriverName] = useState("")
   const [invoiceItems, setInvoiceItems] = useState<OrderItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState("")
   const [quantity, setQuantity] = useState(1)
   const [clients, setClients] = useState(mockCustomers)
   const [showAddClientDialog, setShowAddClientDialog] = useState(false)
 
+  const { formatPrice } = useCurrency()
   const selectedCustomer = clients.find((c) => c.id === selectedCustomerId)
+  const documentConfig = DOCUMENT_TYPES.find((d) => d.type === documentType) || DOCUMENT_TYPES[0]
 
   const handleAddClient = (newClient: Omit<Customer, "id">) => {
     const clientWithId: Customer = {
@@ -100,7 +106,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
 
   const subtotal = invoiceItems.reduce((sum, item) => sum + item.totalPrice, 0)
   const taxRate = 20
-  const taxAmount = subtotal * (taxRate / 100)
+  const taxAmount = documentConfig.showTax ? subtotal * (taxRate / 100) : 0
   const total = subtotal + taxAmount
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -108,6 +114,8 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
     if (!selectedCustomer || invoiceItems.length === 0 || !dueDate) return
 
     const invoice: Omit<Invoice, "id" | "invoiceNumber" | "invoiceDate"> = {
+      documentType,
+      driverName: documentConfig.showDriver ? driverName : undefined,
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
       customerCompany: selectedCustomer.company,
@@ -133,9 +141,11 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
   }
 
   const resetForm = () => {
+    setDocumentType("facture")
     setSelectedCustomerId("")
     setDueDate("")
     setNotes("")
+    setDriverName("")
     setInvoiceItems([])
     setSelectedItemId("")
     setQuantity(1)
@@ -163,11 +173,32 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Créer une nouvelle facture</DialogTitle>
-            <DialogDescription>Créez une facture pour un client avec les articles sélectionnés.</DialogDescription>
+            <DialogTitle>Créer un nouveau document</DialogTitle>
+            <DialogDescription>
+              Créez une facture, bon de livraison, bon d'achat ou devis pour un client.
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="documentType">Type de document *</Label>
+              <Select value={documentType} onValueChange={(value: any) => setDocumentType(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOCUMENT_TYPES.map((docType) => (
+                    <SelectItem key={docType.type} value={docType.type}>
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        {docType.label}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Customer and Due Date */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -214,6 +245,18 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
               </div>
             </div>
 
+            {documentConfig.showDriver && (
+              <div className="space-y-2">
+                <Label htmlFor="driverName">Nom du chauffeur</Label>
+                <Input
+                  id="driverName"
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  placeholder="Nom du chauffeur pour la livraison"
+                />
+              </div>
+            )}
+
             {/* Customer Info Display */}
             {selectedCustomer && (
               <Card>
@@ -253,7 +296,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
                       <SelectContent>
                         {mockInventoryItems.map((item) => (
                           <SelectItem key={item.id} value={item.id}>
-                            {item.name} - €{item.unitPrice} / {formatUnit(item.unit)}
+                            {item.name} - {formatPrice(item.unitPrice)} / {formatUnit(item.unit)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -282,7 +325,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
             {invoiceItems.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Articles de la facture</CardTitle>
+                  <CardTitle>Articles du {documentConfig.label.toLowerCase()}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -308,8 +351,8 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
                               className="w-20"
                             />
                           </TableCell>
-                          <TableCell>€{item.unitPrice.toFixed(2)}</TableCell>
-                          <TableCell>€{item.totalPrice.toFixed(2)}</TableCell>
+                          <TableCell>{formatPrice(item.unitPrice)}</TableCell>
+                          <TableCell>{formatPrice(item.totalPrice)}</TableCell>
                           <TableCell>
                             <Button type="button" variant="outline" size="sm" onClick={() => removeItem(item.id)}>
                               <Trash2 className="h-4 w-4" />
@@ -323,15 +366,17 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
                   <div className="mt-4 space-y-2 text-right">
                     <div className="flex justify-between">
                       <span>Sous-total:</span>
-                      <span>€{subtotal.toFixed(2)}</span>
+                      <span>{formatPrice(subtotal)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>TVA ({taxRate}%):</span>
-                      <span>€{taxAmount.toFixed(2)}</span>
-                    </div>
+                    {documentConfig.showTax && (
+                      <div className="flex justify-between">
+                        <span>TVA ({taxRate}%):</span>
+                        <span>{formatPrice(taxAmount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between font-bold text-lg">
                       <span>Total:</span>
-                      <span>€{total.toFixed(2)}</span>
+                      <span>{formatPrice(total)}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -355,7 +400,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onCreateInvoice }: Cre
                 Annuler
               </Button>
               <Button type="submit" disabled={!selectedCustomerId || invoiceItems.length === 0 || !dueDate}>
-                Créer la facture
+                Créer le {documentConfig.label.toLowerCase()}
               </Button>
             </DialogFooter>
           </form>

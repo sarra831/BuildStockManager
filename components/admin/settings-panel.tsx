@@ -11,8 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Building2, Mail, Phone, Bell, Shield, Database, FileText, Save } from "lucide-react"
+import { useCurrency } from "@/contexts/currency-context"
+
 
 export function SettingsPanel() {
+  const { currency, setCurrency, currencies } = useCurrency()
+
   const [companySettings, setCompanySettings] = useState({
     name: "BuildStock Manager SARL",
     address: "123 Avenue des Matériaux, 75001 Paris, France",
@@ -45,7 +49,6 @@ export function SettingsPanel() {
   const [systemSettings, setSystemSettings] = useState({
     language: "fr",
     timezone: "Europe/Paris",
-    currency: "EUR",
     dateFormat: "DD/MM/YYYY",
     backupFrequency: "daily",
     sessionTimeout: 60,
@@ -62,6 +65,11 @@ export function SettingsPanel() {
   const handleSave = (section: string) => {
     // In a real app, this would save to backend
     console.log(`[v0] Saving ${section} settings`)
+  }
+
+  const handleCurrencyChange = (currencyCode: string) => {
+    setCurrency(currencyCode)
+    console.log(`[v0] Currency changed to ${currencyCode}`)
   }
 
   return (
@@ -424,19 +432,19 @@ export function SettingsPanel() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="currency">Devise</Label>
-                  <Select
-                    value={systemSettings.currency}
-                    onValueChange={(value) => setSystemSettings({ ...systemSettings, currency: value })}
-                  >
+                  <Select value={currency.code} onValueChange={handleCurrencyChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="TND">Dinar Tunisien (د.ت)</SelectItem>
                       <SelectItem value="EUR">Euro (€)</SelectItem>
-                      <SelectItem value="USD">Dollar ($)</SelectItem>
-                      <SelectItem value="GBP">Livre (£)</SelectItem>
+                      <SelectItem value="USD">Dollar US ($)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Devise actuelle: {currency.name} ({currency.symbol})
+                  </p>
                 </div>
 
                 <div className="space-y-2">
